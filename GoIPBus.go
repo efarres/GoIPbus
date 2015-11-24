@@ -42,7 +42,7 @@ import (
 )
 
 // Implementation of IPbus protocol version 2.0
-const IPbusProtocolVersion = 0x2
+const IPbusProtocolVersion = 0x20000000
 
 // 32-bit data transfer
 type IPbusWord int32
@@ -63,13 +63,18 @@ type BaseAddress int32
 type IPbusPacketHeader int32
 
 // PacketID (16 bits)
-type IPbusPacketID int16
+// 
+type IPbusPacketID uint16
 
 // Byte-order (4 bits)
-type IPbusByteOrder int8
+// 	0x0f big-endian
+type IPbusByteOrder uint8
 
 // Packet Type (4 bits)
-type IPbusPacketType int8
+//	ControlPacket IPbusPacketType = 0x00
+//	StatusPacket                  = 0x01
+//	RequestPacket                 = 0x02
+type IPbusPacketType uint8
 
 // The IPbus protocol defines three Packet Types:
 // 		• Control packet (i.e. contains IPbus transactions)
@@ -97,7 +102,14 @@ var packetID IPbusPacketID = 0
 type IPbusControlPacket []int32
 
 //	• Info Code (four bits at 3 → 0)
-type IPbusInfoCode int8
+//	RequestHandledSuccesfully IPbusInfoCode = 0x00
+//	BadHeader                               = 0x01
+//	BusErrorOnRead                          = 0x04
+//	BusErrorOnWrite                         = 0x05
+//	BusTimeOutOnRead                        = 0x06
+//	BusTimeOutOnWrite                       = 0x07
+//	OutboundRequest                         = 0x0f
+type IPbusInfoCode uint8
 
 //	• Info Code
 //		o Defines the direction and error state of the transaction request/response.
@@ -135,10 +147,18 @@ const (
 type IPbusTransactionHeader int32
 
 // Transaction ID (12 bits)
-type IPbusTransactionID int16
+type IPbusTransactionID uint16
 
 // Type ID (4 bits)
-type IPbusTransactionTypeID int8
+//	ReadTypeID                IPbusTransactionTypeID = 0x00 // 3.2	Read transaction (Type ID = 0x0)
+//	NonIncrementalReadTypeID                         = 0x02 // 3.3	Non-incrementing read transaction (Type ID = 0x2))
+//	WriteTypeID                                      = 0x01 // 3.4	Write transaction (Type ID = 0x1)
+//	NonIncrementalWriteTypeID                        = 0x03 // 3.5	Non-incrementing write transaction (Type ID = 0x3)
+//	RMWbitsTypeID                                    = 0x04 // 3.6	Read/Modify/Write bits
+//	RMWsumTypeID                                     = 0x05 // 3.7	Read/Modify/Write sum (RMWsum) transaction (Type ID = 0x5)
+//	ConfigurationSpaceRead                           = 0x06 // 3.8	Configuration space read transaction (Type ID = 0x6)
+//	ConfigurationSpaceWrite                          = 0x07 // 3.9	Configuration space write transaction (Type ID = 0x7)
+type IPbusTransactionTypeID uint8
 
 // Transaction Types
 const (
@@ -175,8 +195,8 @@ var transactionID IPbusTransactionID = 0
 // frames) is 1500 bytes; with an IP header of 20 bytes and a UDP header of 8 bytes,
 // this gives the maximum IPbus packet size of 368 32-bit words, or 1472 bytes.
 // Longer block transfers must be split at the software level into individual packets.
-const maxWordSize int8 = 368
-const maxByteSize int16 = 1472
+const maxWordSize uint16 = 368
+const maxByteSize uint16 = 1472
 
 // baseAddress store the address of the transaction
 var baseAddress = 0
@@ -188,9 +208,9 @@ var transactionSize = 0
 // of an underlying ReaderAt.
 type SectionReader struct {
 	r     ReaderAt
-	base  int64
-	off   int64
-	limit int64
+	base  uint64
+	off   uint64
+	limit uint64
 }
 
 // Implementation of variables according with the io standard package
@@ -394,6 +414,11 @@ func resetTransactionID() error {
 	return nil
 }
 
+func setTransactionID(id IPbusTransactionID) error {
+	transactionID = id
+	return nil
+}
+
 func resetPacketID() error {
 	packetID = 0
 	return nil
@@ -420,11 +445,11 @@ func increaseTransactionID() (err error) {
 }
 
 // Build a IPbus transaction header
-func packetHeader(byteOrder IPbusByteOrder, packetType IpbusPacketType) (header IPbusPacketHeader, err error) {
-	var word int32 = IPbusProtocolVersion << 30
-	word = word & ((transactionType << 4) & packetType)
+func packetHeader(byteOrder IPbusByteOrder, packetType IPbusPacketType) (header IPbusPacketHeader, err error) {
+	var word uint32 = IPbusProtocolVersion // << 30
+	word = word & ((byteOrder << 4) & packetType)
 	word = word & packetID << 16
-	err := increasePacketID()
+	err = increasePacketID()
 	if err != nil {
 		panic()
 	}
@@ -433,36 +458,37 @@ func packetHeader(byteOrder IPbusByteOrder, packetType IpbusPacketType) (header 
 
 // Build a IPbus transaction header
 func transactionHeader(transactionType IPbusTransactionTypeID, size int8) (header IPbusPacketHeader, err error) {
-	var word int32 = IPbusProtocolVersion << 30
+	var word int32 = IPbusProtocolVersion // << 30
 	word = word & ((transactionType << 4) & OutboundRequest)
 	word = word & (size << 8)
 	word = word & transactionID << 16
-	err := increaseTransactionID()
+	err = increaseTransactionID()
 	if err != nil {
 		panic()
 	}
 	return word, err
 }
 
-func readHeader(addr BaseAddres, size int8) (word0 IPbusPacketHeader, err error) {
-	word0, err := transactionHeader(ReadTypeID, size)
+func readHeader(addr BaseAddress, size int8) (word0 IPbusPacketHeader, err error) {
+	word0, err = transactionHeader(ReadTypeID, size)
+	fmt.Println(addr)
 	return word0, err
 }
 
-func writeHeader(addr BaseAddres, word []int32) (word0 IPbusPacketHeader, err error) {
+func writeHeader(addr BaseAddress, data []IPbusWord) (word0 IPbusPacketHeader, err error) {
 	size := size(data)
-	word0, err := transactionHeader(WriteTypeID, size)
+	word0, err = transactionHeader(WriteTypeID, size)
 	return word0, err
 }
 
 func NonIncrementalReadHeader(addr BaseAddres, size int8) (word0 IPbusPacketHeader, err error) {
-	word0, err := transactionHeader(NonIncrementalReadTypeID, size)
+	word0, err = transactionHeader(NonIncrementalReadTypeID, size)
 	return word0, err
 }
 
-func NonIncrementalWriteHeader(addr BaseAddres, word []int32) (word0 IPbusPacketHeader, err error) {
+func NonIncrementalWriteHeader(addr BaseAddres, data []IPbusWord) (word0 IPbusPacketHeader, err error) {
 	size := size(data)
-	word0, err := transactionHeader(NonIncrementalWriteTypeID, size)
+	word0, err = transactionHeader(NonIncrementalWriteTypeID, size)
 	return word0, err
 }
 
