@@ -42,7 +42,7 @@ import (
 )
 
 // Implementation of IPbus protocol version 2.0
-const IPbusProtocolVersion = 0x20000000
+const IPbusProtocolVersion = 0x2
 
 // 32-bit data transfer
 type IPbusWord int32
@@ -63,7 +63,7 @@ type BaseAddress int32
 type IPbusPacketHeader int32
 
 // PacketID (16 bits)
-// 
+//
 type IPbusPacketID uint16
 
 // Byte-order (4 bits)
@@ -199,10 +199,10 @@ const maxWordSize uint16 = 368
 const maxByteSize uint16 = 1472
 
 // baseAddress store the address of the transaction
-var baseAddress = 0
+var baseAddress BaseAddress = 0
 
 // transactionSize define the size of the transaction
-var transactionSize = 0
+var transactionSize uint8 = 0
 
 // SectionReader implements Read, Seek, and ReadAt on a section
 // of an underlying ReaderAt.
@@ -409,16 +409,6 @@ type LimitedReader struct {
 	N int64  // max bytes remaining
 }
 
-func resetTransactionID() error {
-	transactionID = 0
-	return nil
-}
-
-func setTransactionID(id IPbusTransactionID) error {
-	transactionID = id
-	return nil
-}
-
 func resetPacketID() error {
 	packetID = 0
 	return nil
@@ -434,6 +424,16 @@ func increasePacketID() (n IPbusPacketID, err error) {
 	return packetID, nil
 }
 
+func resetTransactionID() error {
+	transactionID = 0
+	return nil
+}
+
+func setTransactionID(id IPbusTransactionID) error {
+	transactionID = id
+	return nil
+}
+
 // Transaction ID (12 bits) [0x0 , 0x0fff]
 func increaseTransactionID() (err error) {
 	if transactionID == 0x0fff {
@@ -446,49 +446,68 @@ func increaseTransactionID() (err error) {
 
 // Build a IPbus transaction header
 func packetHeader(byteOrder IPbusByteOrder, packetType IPbusPacketType) (header IPbusPacketHeader, err error) {
-	var word uint32 = IPbusProtocolVersion // << 30
-	word = word & ((byteOrder << 4) & packetType)
-	word = word & packetID << 16
-	err = increasePacketID()
+	var word uint32 = IPbusProtocolVersion << 28
+	word = word | ((uint32(byteOrder) << 4) | uint32(packetType))
+	word = word | uint32(packetID)<<16
+	_, err = increasePacketID()
 	if err != nil {
-		panic()
+		panic("Error generating Packet ID")
 	}
-	return word, err
+	return IPbusPacketHeader(word), err
 }
 
 // Build a IPbus transaction header
-func transactionHeader(transactionType IPbusTransactionTypeID, size int8) (header IPbusPacketHeader, err error) {
-	var word int32 = IPbusProtocolVersion // << 30
-	word = word & ((transactionType << 4) & OutboundRequest)
-	word = word & (size << 8)
-	word = word & transactionID << 16
+func transactionHeader(transactionType IPbusTransactionTypeID, size uint8) (header IPbusTransactionHeader, err error) {
+	var word uint32 = IPbusProtocolVersion << 28
+	word = word | ((uint32(transactionType) << 4) | uint32(OutboundRequest))
+	word = word | (uint32(size) << 8)
+	word = word | uint32(transactionID)<<16
 	err = increaseTransactionID()
 	if err != nil {
-		panic()
+		panic("Error generating Transaction ID")
 	}
-	return word, err
+	return IPbusTransactionHeader(word), err
 }
 
-func readHeader(addr BaseAddress, size int8) (word0 IPbusPacketHeader, err error) {
+func readHeader(size uint8) (word0 IPbusTransactionHeader, err error) {
 	word0, err = transactionHeader(ReadTypeID, size)
-	fmt.Println(addr)
 	return word0, err
 }
 
-func writeHeader(addr BaseAddress, data []IPbusWord) (word0 IPbusPacketHeader, err error) {
-	size := size(data)
+func writeHeader(data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
+	size := uint8(len(data))
 	word0, err = transactionHeader(WriteTypeID, size)
 	return word0, err
 }
 
-func NonIncrementalReadHeader(addr BaseAddres, size int8) (word0 IPbusPacketHeader, err error) {
+func NonIncrementalReadHeader(size uint8) (word0 IPbusTransactionHeader, err error) {
 	word0, err = transactionHeader(NonIncrementalReadTypeID, size)
 	return word0, err
 }
 
-func NonIncrementalWriteHeader(addr BaseAddres, data []IPbusWord) (word0 IPbusPacketHeader, err error) {
-	size := size(data)
+func NonIncrementalWriteHeader(data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
+	size := uint8(len(data))
 	word0, err = transactionHeader(NonIncrementalWriteTypeID, size)
+	return word0, err
+}
+
+func readRequest(addr BaseAddress, size uint8) (word0 IPbusTransactionHeader, err error) {
+	word0, err = readHeader(size)
+	return word0, err
+}
+
+func writeRequest(addr BaseAddress, data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
+	word0, err = writeHeader(data)
+	return word0, err
+}
+
+func NonIncrementalReadRequest(addr BaseAddress, size uint8) (word0 IPbusTransactionHeader, err error) {
+	word0, err = NonIncrementalReadHeader(size)
+	return word0, err
+}
+
+func NonIncrementalWriteRequest(addr BaseAddress, data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
+	word0, err = NonIncrementalWriteHeader(data)
 	return word0, err
 }
 
@@ -497,29 +516,35 @@ func setBaseAddress(addr BaseAddress) error {
 	return nil
 }
 
-func setTransactionSize(size int8) error {
+func setTransactionSize(size uint8) error {
 	transactionSize = size
 	return nil
 }
 
 func Read(p []byte) (n int, err error) {
-	word0, err := transactionHeader(ReadTypeID, size)
-	return word0, err
+	n0 := uint8(n)
+	word0, err := transactionHeader(ReadTypeID, n0)
+	fmt.Println(word0)
+	n1 := 0
+	return n1, err
 }
 
-func Seek(offset int64, whence int) (int64, error) {
+//func Seek(offset int64, whence int) (int64, error) {
 
+//}
+
+func Write(p []byte) (n int, err error) {
+	n0 := uint8(n)
+	word0, err := transactionHeader(ReadTypeID, n0)
+	fmt.Println(word0)
+	n1 := 0
+	return n1, err
 }
 
-func Write(p []byte) (nn int, err error) {
-	word0, err := transactionHeader(ReadTypeID, size)
-	return word0, err
-}
+//func WriteAt(p []byte, off int64) (n int, err error) {
 
-func WriteAt(p []byte, off int64) (n int, err error) {
+//}
 
-}
+//func WriteTo(w Writer) (n int64, err error) {
 
-func WriteTo(w Writer) (n int64, err error) {
-
-}
+//}
