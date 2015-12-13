@@ -108,11 +108,26 @@ type IPbusControlPacket struct {
 	reqs [3]IPbusRequest
 }
 
+// IPbusRequest structure for Encode/Decode
 type IPbusRequest struct {
-	th   IPbusTransactionHeader
-	addr BaseAddress
-	size uint8
-	data []IPbusWord
+	id       IPbusTransactionID
+	words    uint8
+	typeId   IPbusTransactionTypeID
+	infoCode IPbusInfoCode
+	addr     BaseAddress
+	data     []IPbusWord
+	th       IPbusTransactionHeader
+	b        []byte
+}
+
+// IPbusResponse structure for Encode/decode
+type IPbusResponse struct {
+	id       IPbusTransactionID
+	words    uint8
+	typeId   IPbusTransactionTypeID
+	infoCode IPbusInfoCode
+	data     []IPbusWord
+	b        []byte
 }
 
 //	• Info Code (four bits at 3 → 0)
@@ -248,6 +263,9 @@ var ErrNoProgress = errors.New("multiple Read calls return no data or error")
 // private package error variables
 var errWhence = errors.New("Seek: invalid whence")
 var errOffset = errors.New("Seek: invalid offset")
+
+//
+var errTypeNotSupported = errors.New("IPbus Type Id not supported")
 
 // Interfaces
 
@@ -423,19 +441,22 @@ type LimitedReader struct {
 	N int64  // max bytes remaining
 }
 
+// --------------------------------------------------------
+// IPbus functions
+// --------------------------------------------------------
 // Reset Packet for IPbus-level reliability mechanism
 func resetPacketID() error {
 	packetID = 0
 	return nil
 }
 
-// Set Packet ID for Test pourpose
+// Set Packet ID for Test Purpose
 func setPacketID(n IPbusPacketID) error {
 	packetID = n
 	return nil
 }
 
-// Packet ID (16 bits) [0x0 , 0xffff]
+// Increase Packet ID sequence (16 bits) [0x0 , 0xffff]
 func increasePacketID() (n IPbusPacketID, err error) {
 	if packetID == 0xffff {
 		packetID = 0
@@ -451,13 +472,13 @@ func resetTransactionID() error {
 	return nil
 }
 
-// Set Transaction ID for Test pourpose
+// Set Transaction ID for Test Purpose
 func setTransactionID(id IPbusTransactionID) error {
 	transactionID = id
 	return nil
 }
 
-// Transaction ID (12 bits) [0x0 , 0x0fff]
+// Increase Transaction ID sequence (12 bits) [0x0 , 0x0fff]
 func increaseTransactionID() (err error) {
 	if transactionID == 0x0fff {
 		transactionID = 0
@@ -467,7 +488,19 @@ func increaseTransactionID() (err error) {
 	return nil
 }
 
-// Build a IPbus transaction header
+// Set a default Base Address for Test Purposes
+func setBaseAddress(addr BaseAddress) error {
+	baseAddress = addr
+	return nil
+}
+
+// Set the default transaction size Test Purposes
+func setTransactionSize(size uint8) error {
+	transactionSize = size
+	return nil
+}
+
+// Encode a IPbus transaction header
 func packetHeader(byteOrder IPbusByteOrder, packetType IPbusPacketType) (header IPbusPacketHeader, err error) {
 	var word uint32 = IPbusProtocolVersion << 28
 	word = word | ((uint32(byteOrder) << 4) | uint32(packetType))
@@ -479,7 +512,7 @@ func packetHeader(byteOrder IPbusByteOrder, packetType IPbusPacketType) (header 
 	return IPbusPacketHeader(word), err
 }
 
-// Build a IPbus transaction header
+// Encode a IPbus transaction header
 func transactionHeader(transactionType IPbusTransactionTypeID, size uint8) (header IPbusTransactionHeader, err error) {
 	var word uint32 = IPbusProtocolVersion << 28
 	word = word | ((uint32(transactionType) << 4) | uint32(OutboundRequest))
@@ -492,78 +525,45 @@ func transactionHeader(transactionType IPbusTransactionTypeID, size uint8) (head
 	return IPbusTransactionHeader(word), err
 }
 
-// Build a IPbus Read Transaction Header (Type ID = 0x0)
+// Encode a IPbus Read Transaction Header (Type ID = 0x0)
 func readHeader(size uint8) (word0 IPbusTransactionHeader, err error) {
 	word0, err = transactionHeader(ReadTypeID, size)
 	return word0, err
 }
 
-// Build a IPbus Write Transaction Header (Type ID = 0x1)
+// Encode a IPbus Write Transaction Header (Type ID = 0x1)
 func writeHeader(data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
 	size := uint8(len(data))
 	word0, err = transactionHeader(WriteTypeID, size)
 	return word0, err
 }
 
-// Build a IPbus Non-incremental Read Transaction Header (Type ID = 0x2)
+// Encode a IPbus Non-incremental Read Transaction Header (Type ID = 0x2)
 func NonIncrementalReadHeader(size uint8) (word0 IPbusTransactionHeader, err error) {
 	word0, err = transactionHeader(NonIncrementalReadTypeID, size)
 	return word0, err
 }
 
-// Build a IPbus Non-incremental Read Transaction Header (Type ID = 0x3)
+// Encode a IPbus Non-incremental Read Transaction Header (Type ID = 0x3)
 func NonIncrementalWriteHeader(data []IPbusWord) (word0 IPbusTransactionHeader, err error) {
 	size := uint8(len(data))
 	word0, err = transactionHeader(NonIncrementalWriteTypeID, size)
 	return word0, err
 }
 
-func (cp *IPbusControlPacket) Build(b []byte) (n int, err error) {
-	buf := new(bytes.Buffer)
-	ph, err := packetHeader(BigEndian, ControlPacket)
-	err = binary.Write(buf, binary.BigEndian, ph)
-	if err != nil {
-		panic("Error generating request buffer")
-	}
-	cp.ph = ph
-
-	br := make([]byte, 8)
-	for _, v := range cp.reqs {
-		_, err := v.BuildRequest(br)
-		if err != nil {
-			panic("Error generating request buffer")
-		}
-		n, err = buf.Write(br)
-	}
-
-	n = copy(b, buf.Bytes())
-	return n, err
+// Encode a IPbus RMWbits Transaction Header (Type ID = 0x4)
+func RMWbitsHeader() (word0 IPbusTransactionHeader, err error) {
+	word0, err = transactionHeader(RMWbitsTypeID, 1)
+	return word0, err
 }
 
-// Build a byte array containing an IPbus packet
-func (tr *IPbusRequest) BuildRequest(b []byte) (n int, err error) {
-	buf := new(bytes.Buffer)
-
-	err = binary.Write(buf, binary.BigEndian, tr.th)
-	if err != nil {
-		panic("Error generating request buffer")
-	}
-	err = binary.Write(buf, binary.BigEndian, tr.addr)
-	if err != nil {
-		panic("Error generating request buffer")
-	}
-	for _, v := range tr.data {
-		err = binary.Write(buf, binary.BigEndian, v)
-		if err != nil {
-			panic("Error generating request buffer")
-		}
-	}
-	n = copy(b, buf.Bytes())
-
-	return n, err
+// Encode a IPbus RMWsum Transaction Header (Type ID = 0x5)
+func RMWsumHeader() (word0 IPbusTransactionHeader, err error) {
+	word0, err = transactionHeader(RMWsumTypeID, 1)
+	return word0, err
 }
 
-// Build a byte array containing an IPbus Control packet with a single request
+// Encode a byte array containing an IPbus Control packet with a single request
 func packetBufRequest(ph IPbusPacketHeader, th IPbusTransactionHeader, addr BaseAddress, data []IPbusWord) (b []byte, err error) {
 	buf := new(bytes.Buffer)
 
@@ -588,7 +588,7 @@ func packetBufRequest(ph IPbusPacketHeader, th IPbusTransactionHeader, addr Base
 	return buf.Bytes(), err
 }
 
-// Build a byte array containing an IPbus request
+// Encode a byte array containing an IPbus request
 func transactionBufRequest(th IPbusTransactionHeader, addr BaseAddress, data []IPbusWord) (b []byte, err error) {
 	buf := new(bytes.Buffer)
 
@@ -609,92 +609,405 @@ func transactionBufRequest(th IPbusTransactionHeader, addr BaseAddress, data []I
 	return buf.Bytes(), err
 }
 
+// ----------------------------------------------------------------------------
+// Single IPbus Control Packet encoding from basic goIPbus types
+// ----------------------------------------------------------------------------
+
+// IPbus Control Packet with a single request, type:
+// 		ReadTypeID                 = 0x00 // 3.2	Read transaction (Type ID = 0x0)
 func readRequest(addr BaseAddress, size uint8) (b []byte, err error) {
-	word0, err := packetHeader(BigEndian, ControlPacket)
-	word1, err := readHeader(size)
-	word2 := addr
-	b, err = packetBufRequest(word0, word1, word2, nil)
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := readHeader(size)
+	word1 := addr
+	b, err = packetBufRequest(ph, word0, word1, nil)
 	return b, err
 }
 
+// IPbus Control Packet with a single request, type:
+//		WriteTypeID                = 0x01 // 3.4	Write transaction (Type ID = 0x1)
 func writeRequest(addr BaseAddress, data []IPbusWord) (b []byte, err error) {
-	word0, err := packetHeader(BigEndian, ControlPacket)
-	word1, err := writeHeader(data)
-	word2 := addr
-	b, err = packetBufRequest(word0, word1, word2, data)
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := writeHeader(data)
+	word1 := addr
+	b, err = packetBufRequest(ph, word0, word1, data)
 	return b, err
 }
 
+// IPbus Control Packet with a single request, type:
+// 		NonIncrementalReadTypeID   = 0x02 // 3.3	Non-incrementing read transaction (Type ID = 0x2))
 func NonIncrementalReadRequest(addr BaseAddress, size uint8) (b []byte, err error) {
-	word0, err := packetHeader(BigEndian, ControlPacket)
-	word1, err := NonIncrementalReadHeader(size)
-	word2 := addr
-	b, err = packetBufRequest(word0, word1, word2, nil)
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := NonIncrementalReadHeader(size)
+	word1 := addr
+	b, err = packetBufRequest(ph, word0, word1, nil)
 	return b, err
 }
 
+// IPbus Control Packet with a single request, type:
+// 		NonIncrementalWriteTypeID  = 0x03 // 3.5	Non-incrementing write transaction (Type ID = 0x3)
 func NonIncrementalWriteRequest(addr BaseAddress, data []IPbusWord) (b []byte, err error) {
-	word0, err := packetHeader(BigEndian, ControlPacket)
-	word1, err := NonIncrementalWriteHeader(data)
-	word2 := addr
-	b, err = packetBufRequest(word0, word1, word2, data)
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := NonIncrementalWriteHeader(data)
+	word1 := addr
+	b, err = packetBufRequest(ph, word0, word1, data)
 	return b, err
+}
+
+// IPbus Control Packet with a single request, type:
+// 		RMWbitsTypeID              = 0x04 // 3.6	Read/Modify/Write bits
+func RMWbitsRequest(addr BaseAddress, andTerm, orTerm IPbusWord) (b []byte, err error) {
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := RMWbitsHeader()
+	word1 := addr
+	data := make([]IPbusWord, 1)
+	data[0] = andTerm
+	data[1] = orTerm
+	b, err = packetBufRequest(ph, word0, word1, data)
+	return b, err
+}
+
+// IPbus Control Packet with a single request, type:
+// 		RMWsumTypeID               = 0x05 // 3.7	Read/Modify/Write sum (RMWsum) transaction (Type ID = 0x5)
+func RMWsumRequest(addr BaseAddress, addend IPbusWord) (b []byte, err error) {
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	word0, err := RMWsumHeader()
+	word1 := addr
+	data := make([]IPbusWord, 1)
+	data[0] = addend
+	b, err = packetBufRequest(ph, word0, word1, data)
+	return b, err
+}
+
+//	New	Read transaction (Type ID = 0x0)
+func NewReadRequest(addr BaseAddress, size uint8) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = ReadTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = size
+
+	return tr
+}
+
+//	New Write transaction (Type ID = 0x1)
+func NewWriteRequest(addr BaseAddress, data []IPbusWord) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = WriteTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = uint8(len(data))
+	tr.data = data
+
+	return tr
+}
+
+//	New Non-incrementing read transaction (Type ID = 0x2))
+func NewNonIncrementalReadRequest(addr BaseAddress, size uint8) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = NonIncrementalReadTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = size
+
+	return tr
+}
+
+//	New Non-incrementing write transaction (Type ID = 0x3)
+func NewNonIncrementalWriteRequest(addr BaseAddress, data []IPbusWord) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = NonIncrementalWriteTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = uint8(len(data))
+	tr.data = data
+
+	return tr
+}
+
+//	New Read/Modify/Write bits
+func NewRMWbitsRequest(addr BaseAddress, andTerm, orTerm IPbusWord) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = RMWbitsTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = 1
+
+	// data
+	data := make([]IPbusWord, 2)
+	data[0] = andTerm
+	data[1] = orTerm
+	tr.data = data
+
+	return tr
+}
+
+//	New Read/Modify/Write sum (RMWsum) transaction (Type ID = 0x5)
+func NewRMWsumRequest(addr BaseAddress, addend IPbusWord) *IPbusRequest {
+	// construct transaction request
+	tr := new(IPbusRequest)
+	// Set provided transaction fields
+	tr.typeId = RMWsumTypeID
+	tr.infoCode = OutboundRequest
+	tr.addr = addr
+	tr.words = 1
+
+	// data
+	data := make([]IPbusWord, 1)
+	data[0] = addend
+	tr.data = data
+
+	return tr
+}
+
+// -----------------------------------------------------------------------------
+// IPbus Control Packet Methods
+// -----------------------------------------------------------------------------
+
+// IPbus Control Packet Encode
+func (cp *IPbusControlPacket) Encode(b []byte) (n int, err error) {
+	buf := new(bytes.Buffer)
+	ph, err := packetHeader(BigEndian, ControlPacket)
+	err = binary.Write(buf, binary.BigEndian, ph)
+	if err != nil {
+		panic("Error generating request buffer")
+	}
+	cp.ph = ph
+
+	for _, v := range cp.reqs {
+		_, err := v.Encode()
+		if err != nil {
+			panic("Error generating request buffer")
+		}
+		n, err = buf.Write(v.b)
+	}
+
+	n = copy(b, buf.Bytes())
+	return n, err
+}
+
+// -----------------------------------------------------------------------------
+// IPbus Request Methods
+// -----------------------------------------------------------------------------
+
+// Encode a byte array containing an IPbus packet
+// Required request information is defined in IPbusRequest structure. Supported transactions request are:
+// 		ReadTypeID                 = 0x00 // 3.2	Read transaction (Type ID = 0x0)
+// 		NonIncrementalReadTypeID   = 0x02 // 3.3	Non-incrementing read transaction (Type ID = 0x2))
+//		WriteTypeID                = 0x01 // 3.4	Write transaction (Type ID = 0x1)
+// 		NonIncrementalWriteTypeID  = 0x03 // 3.5	Non-incrementing write transaction (Type ID = 0x3)
+// 		RMWbitsTypeID              = 0x04 // 3.6	Read/Modify/Write bits
+// 		RMWsumTypeID               = 0x05 // 3.7	Read/Modify/Write sum (RMWsum) transaction (Type ID = 0x5)
+// 		ConfigurationSpaceRead     = 0x06 // 3.8	Configuration space read transaction (Type ID = 0x6)
+// 		ConfigurationSpaceWrite    = 0x07 // 3.9	Configuration space write transaction (Type ID = 0x7)
+//func (tr *IPbusRequest) Encode(b []byte) (n int, err error) {
+func (tr *IPbusRequest) Encode() (n int, err error) {
+	// set header and Transaction ID
+	tr.id = transactionID
+
+	// build headers
+	switch tr.typeId {
+	// Select header builder
+	case ReadTypeID:
+		h, err := readHeader(tr.words)
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	case WriteTypeID:
+		h, err := writeHeader(tr.data)
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	case NonIncrementalReadTypeID:
+		h, err := NonIncrementalReadHeader(tr.words)
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	case NonIncrementalWriteTypeID:
+		h, err := NonIncrementalWriteHeader(tr.data)
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	case RMWbitsTypeID:
+		h, err := RMWbitsHeader()
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	case RMWsumTypeID:
+		// Header
+		h, err := RMWsumHeader()
+		if err != nil {
+			panic("Error generating header")
+		}
+		tr.th = h
+	}
+
+	// Buffer streaming
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.BigEndian, tr.th)
+	if err != nil {
+		panic("Error generating request buffer")
+	}
+	err = binary.Write(buf, binary.BigEndian, tr.addr)
+	if err != nil {
+		panic("Error generating request buffer")
+	}
+	for _, v := range tr.data {
+		err = binary.Write(buf, binary.BigEndian, v)
+		if err != nil {
+			panic("Error generating request buffer")
+		}
+	}
+
+	// Copy buffer content into the request byte array
+	b := make([]byte, buf.Len())
+	n = copy(b, buf.Bytes())
+	tr.b = b[0:n]
+
+	// return number of bytes and error
+	return n, err
 }
 
 // Transaction methods
-func (tr *IPbusRequest) Read(b []byte) (n int, err error) {
-	word1, err := readHeader(tr.size)
-	//	if tr.addr == nil {
-	//		tr.addr = baseAddress
-	//	}
-	word2 := tr.addr
-	b, err = transactionBufRequest(word1, word2, nil)
-	n = len(b)
+//	ReadTypeID                 = 0x00 // 3.2	Read transaction (Type ID = 0x0)
+func (tr *IPbusRequest) Read(addr BaseAddress, size uint8) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = ReadTypeID
+	tr.addr = addr
+	tr.words = size
+
+	// Encode transacation request
+	n, err = tr.Encode()
+
 	return n, err
 }
 
-func (tr *IPbusRequest) Write(b []byte) (n int, err error) {
-	word1, err := writeHeader(tr.data)
-	//	if tr.addr == nil {
-	//		tr.addr = baseAddress
-	//	}
-	word2 := tr.addr
-	b, err = transactionBufRequest(word1, word2, tr.data)
-	n = len(b)
+//	WriteTypeID                = 0x01 // 3.4	Write transaction (Type ID = 0x1)
+func (tr *IPbusRequest) Write(addr BaseAddress, data []IPbusWord) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = WriteTypeID
+	tr.addr = addr
+	tr.words = uint8(len(data))
+
+	// Encode transacation request
+	n, err = tr.Encode()
+
 	return n, err
 }
 
-func (tr *IPbusRequest) NonIncrementalRead(b []byte) (n int, err error) {
-	word1, err := NonIncrementalReadHeader(tr.size)
-	//	if tr.addr == nil {
-	//		tr.addr = baseAddress
-	//	}
-	word2 := tr.addr
-	b, err = transactionBufRequest(word1, word2, nil)
-	n = len(b)
+//	NonIncrementalReadTypeID   = 0x02 // 3.3	Non-incrementing read transaction (Type ID = 0x2))
+func (tr *IPbusRequest) NonIncrementalRead(addr BaseAddress, size uint8) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = NonIncrementalReadTypeID
+	tr.addr = addr
+	tr.words = size
+
+	// Encode transacation request
+	n, err = tr.Encode()
+
 	return n, err
 }
 
-func (tr *IPbusRequest) NonIncrementalWrite(b []byte) (n int, err error) {
-	word1, err := NonIncrementalWriteHeader(tr.data)
-	//	if tr.addr == nil {
-	//		tr.addr = baseAddress
-	//	}
-	word2 := tr.addr
-	b, err = transactionBufRequest(word1, word2, tr.data)
-	n = len(b)
+//	NonIncrementalWriteTypeID  = 0x03 // 3.5	Non-incrementing write transaction (Type ID = 0x3)
+func (tr *IPbusRequest) NonIncrementalWrite(addr BaseAddress, data []IPbusWord) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = NonIncrementalWriteTypeID
+	tr.addr = addr
+	tr.words = uint8(len(data))
+
+	// Encode transacation request
+	n, err = tr.Encode()
+
 	return n, err
 }
 
-func setBaseAddress(addr BaseAddress) error {
-	baseAddress = addr
-	return nil
+//	RMWbitsTypeID              = 0x04 // 3.6	Read/Modify/Write bits
+func (tr *IPbusRequest) RMWbits(addr BaseAddress, andTerm, orTerm IPbusWord) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = RMWbitsTypeID
+	tr.addr = addr
+	tr.words = 1
+
+	// data
+	data := make([]IPbusWord, 1)
+	data[0] = andTerm
+	data[1] = orTerm
+	// Encode transacation request
+	n, err = tr.Encode()
+
+	return n, err
 }
 
-func setTransactionSize(size uint8) error {
-	transactionSize = size
-	return nil
+//	RMWsumTypeID               = 0x05 // 3.7	Read/Modify/Write sum (RMWsum) transaction (Type ID = 0x5)
+func (tr *IPbusRequest) RMWsum(addr BaseAddress, addend IPbusWord) (n int, err error) {
+	// Set provided transaction fields
+	tr.typeId = RMWsumTypeID
+	tr.addr = addr
+	tr.words = 1
+
+	// data
+	data := make([]IPbusWord, 1)
+	data[0] = addend
+	// Encode transacation request
+	n, err = tr.Encode()
+
+	return n, err
 }
+
+// -----------------------------------------------------------------------------
+// Response methods
+// -----------------------------------------------------------------------------
+func (resp *IPbusResponse) Decode(dst IPbusRequest) (err error) {
+
+	buf := new(bytes.Buffer)
+	err = binary.Write(buf, binary.BigEndian, resp.b)
+	if err != nil {
+		panic("Error generating request buffer")
+	}
+
+	//	size := buf.Len() / 4
+	var r []uint32
+
+	err = binary.Read(buf, binary.BigEndian, &r)
+	if err != nil {
+		panic("Error generating request buffer")
+	}
+	word := r[0]
+	protocol := (0xF0000000 & word) >> 28
+	id := (0x0FF00000 & word) >> 16
+	words := (0x0000FF00 & word) >> 8
+	typeId := (0x000000F0 & word)
+	infoCode := (0x0000000F & word)
+
+	if protocol != 0x2 {
+		panic("Protocol Error")
+	}
+
+	dst.id = IPbusTransactionID(id)
+	dst.words = uint8(words)
+	dst.typeId = IPbusTransactionTypeID(typeId)
+	dst.infoCode = IPbusInfoCode(infoCode)
+
+	return err
+}
+
+//
+//
+//
 
 func Read(p []byte) (n int, err error) {
 	n0 := uint8(n)

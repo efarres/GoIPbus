@@ -200,16 +200,14 @@ func TestControlPackage(t *testing.T) {
 	rq := new(IPbusRequest)
 	rq.addr = baseAddress
 	rq.data = nil
-	rq.size = size
-	th, err := readHeader(size)
-	rq.th = th
+	rq.words = size
 	if err != nil {
 		t.Errorf("Error %v\n", err)
 	}
 	b = make([]byte, 12)
 	p0 := new(IPbusControlPacket)
 	p0.reqs[0] = *rq
-	n, err := p0.Build(b)
+	n, err := p0.Encode(b)
 	if !bytes.Equal(bt, b) {
 		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, b)
 	}
@@ -233,28 +231,115 @@ func TestRequest(t *testing.T) {
 		t.Errorf("Error %v\n", err)
 	}
 
-	//
+	// Define Transaction request
 	rq := new(IPbusRequest)
+	rq.typeId = ReadTypeID
 	rq.addr = baseAddress
 	rq.data = nil
-	rq.size = size
-	th, err := readHeader(size)
-	rq.th = th
-	if err != nil {
-		t.Errorf("Error %v\n", err)
-	}
+	rq.words = size
 
-	// 20 0003 f 0
+	// Encode method
+	n, err := rq.Encode()
+	// 20 0001 f 0
 	// 2 002 0b 0 f
 	// 00000efb
 	bt := []byte{
 		0x20, 0x01, 0x0a, 0x0f,
 		0x00, 0x00, 0x0e, 0xfb,
 	}
-	b := make([]byte, 8)
-	n, err := rq.BuildRequest(b)
-	if !bytes.Equal(bt, b) {
-		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, b)
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
 	}
-	fmt.Printf("Generated %v bytes, request 0x%x\n", n, b)
+	fmt.Printf("Generated %v bytes, request 0x%x\n", n, rq.b)
+
+	// Read set transaction header and
+	n, err = rq.Read(rq.addr, rq.words)
+	// 20 0002 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x02, 0x0a, 0x0f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated %v bytes, request 0x%x\n", n, rq.b)
+
+	// 20 0003 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x03, 0x0a, 0x0f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	n, err = rq.Encode()
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated %v bytes, request 0x%x\n", n, rq.b)
+
+}
+
+func TestNewRequests(t *testing.T) {
+	var id IPbusTransactionID = 5
+
+	// Set Transaction ID
+	err := setTransactionID(id)
+	if err != nil {
+		t.Errorf("Error %v\n", err)
+	}
+	rq := NewReadRequest(0xefb, 0xe)
+	rq.Encode()
+	bt := []byte{0x20, 0x05, 0x0e, 0x0f, 0x00, 0x00, 0x0e, 0xfb}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+	rq = NewNonIncrementalReadRequest(0xefb, 0xa)
+	rq.Encode()
+	bt = []byte{0x20, 0x06, 0x0a, 0x2f, 0x00, 0x00, 0x0e, 0xfb}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+	rq = NewWriteRequest(0xefb, []IPbusWord{0x3, 0x4, 0x5})
+	rq.Encode()
+	bt = []byte{0x20, 0x07, 0x03, 0x1f,
+		0x00, 0x00, 0x0e, 0xfb,
+		0x00, 0x00, 0x00, 0x03,
+		0x00, 0x00, 0x00, 0x04,
+		0x00, 0x00, 0x00, 0x05,
+	}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+	rq = NewNonIncrementalWriteRequest(0xefb, []IPbusWord{0x6, 0x7, 0x8})
+	rq.Encode()
+	bt = []byte{0x20, 0x08, 0x03, 0x3f, 0x00, 0x00, 0x0e, 0xfb, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x08}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+	rq = NewRMWsumRequest(0xefb, 0xf)
+	rq.Encode()
+	bt = []byte{0x20, 0x09, 0x01, 0x5f, 0x00, 0x00, 0x0e, 0xfb, 0x00, 0x00, 0x00, 0x0f}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+	rq = NewRMWbitsRequest(0xefb, 0x00FF, 0xFF00)
+	rq.Encode()
+	bt = []byte{0x20, 0x0a, 0x01, 0x4f, 0x00, 0x00, 0x0e, 0xfb, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Generated request 0x%x\n", rq.b)
+
 }
