@@ -19,6 +19,8 @@ func TestHeader(t *testing.T) {
 	var size uint8 = 1
 	var id IPbusTransactionID = 1
 
+	fmt.Println("Starting Test Header")
+
 	// Read transaction Example
 	// Ver = 0x20 PacketID = 0x0000 Byte-Order= 0x0 Packet TypeID = 0x0
 	// 0x2 000 00 0 f
@@ -30,7 +32,7 @@ func TestHeader(t *testing.T) {
 
 	//
 	var pword IPbusPacketHeader
-	pword, err := packetHeader(0xf, ControlPacket)
+	pword, err := encodePacketHeader(0xf, ControlPacket)
 	if err != nil {
 		t.Errorf("Error %v\n", err)
 	}
@@ -48,7 +50,7 @@ func TestHeader(t *testing.T) {
 	ptypeID = IPbusPacketHeader(0x0)
 	pheader = pheader | pID | order | ptypeID
 
-	pword, err = packetHeader(0xf, ControlPacket)
+	pword, err = encodePacketHeader(0xf, ControlPacket)
 	if err != nil {
 		t.Errorf("Error %v\n", err)
 	}
@@ -57,7 +59,6 @@ func TestHeader(t *testing.T) {
 	}
 	fmt.Printf("Generated header %x\n", pheader)
 
-	fmt.Println("Starting Test Header")
 	err = setTransactionID(id)
 	if err != nil {
 		t.Error("Error %v", err)
@@ -75,7 +76,7 @@ func TestHeader(t *testing.T) {
 
 	//
 	var word0 IPbusTransactionHeader
-	word0, err = transactionHeader(ReadTypeID, size)
+	word0, err = encodeTransactionHeader(ReadTypeID, size)
 	if err != nil {
 		t.Errorf("Error %v\n", err)
 	}
@@ -94,7 +95,7 @@ func TestHeader(t *testing.T) {
 	infoCode = IPbusTransactionHeader(0xf)
 	header = header | trans | words | typeID | infoCode
 
-	word0, err = transactionHeader(WriteTypeID, size)
+	word0, err = encodeTransactionHeader(WriteTypeID, size)
 	if err != nil {
 		t.Errorf("Error %v", err)
 	}
@@ -113,7 +114,7 @@ func TestHeader(t *testing.T) {
 	infoCode = IPbusTransactionHeader(0xf)
 	header = header | trans | words | typeID | infoCode
 
-	word0, err = readHeader(size)
+	word0, err = encodeReadHeader(size)
 	if err != nil {
 		t.Errorf("Error %v\n", err)
 	}
@@ -133,7 +134,7 @@ func TestHeader(t *testing.T) {
 	header = header | trans | words | typeID | infoCode
 
 	data := []IPbusWord{1, 2, 3, 4, 5, 6, 7, 8}
-	word0, err = writeHeader(data)
+	word0, err = encodeWriteHeader(data)
 	if err != nil {
 		t.Errorf("Error %v", err)
 	}
@@ -214,7 +215,7 @@ func TestControlPackage(t *testing.T) {
 	fmt.Printf("Generated %v bytes, request 0x%x\n", n, b)
 }
 
-func TestRequest(t *testing.T) {
+func TestEncode(t *testing.T) {
 	var size uint8 = 0xA
 	var id IPbusTransactionID = 1
 	var addr BaseAddress = 0xEFB
@@ -237,6 +238,7 @@ func TestRequest(t *testing.T) {
 	rq.addr = baseAddress
 	rq.data = nil
 	rq.words = size
+	rq.id = transactionID
 
 	// Encode method
 	n, err := rq.Encode()
@@ -253,7 +255,7 @@ func TestRequest(t *testing.T) {
 	fmt.Printf("Generated %v bytes, request 0x%x\n", n, rq.b)
 
 	// Read set transaction header and
-	n, err = rq.Read(rq.addr, rq.words)
+	n, err = rq.Encode()
 	// 20 0002 f 0
 	// 2 002 0b 0 f
 	// 00000efb
@@ -341,5 +343,146 @@ func TestNewRequests(t *testing.T) {
 		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
 	}
 	fmt.Printf("Generated request 0x%x\n", rq.b)
+
+}
+
+func TestRead(t *testing.T) {
+	var size uint8 = 0xA
+	var id IPbusTransactionID = 1
+	var addr BaseAddress = 0xEFB
+
+	// Set Transaction ID
+	err := setTransactionID(id)
+	if err != nil {
+		t.Errorf("Error %v\n", err)
+	}
+
+	// Set Transaction Base Address
+	err = setBaseAddress(addr)
+	if err != nil {
+		t.Errorf("Error %v\n", err)
+	}
+
+	// Define Transaction request
+	rq := new(IPbusRequest)
+	rq.typeId = ReadTypeID
+	rq.addr = baseAddress
+	rq.data = nil
+	rq.words = size
+	rq.id = transactionID
+
+	// Encode method
+	n, err := rq.Read(rq.b)
+	// 20 0001 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt := []byte{
+		0x20, 0x01, 0x0a, 0x0f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Readed %v bytes, values 0x%x\n", n, rq.b)
+
+	// Read set transaction header and
+	n, err = rq.Read(rq.b)
+	// 20 0002 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x02, 0x0a, 0x0f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Readed %v bytes, values 0x%x\n", n, rq.b)
+
+	// 20 0003 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x03, 0x0a, 0x0f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	n, err = rq.Read(rq.b)
+	if !bytes.Equal(bt, rq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, rq.b)
+	}
+	fmt.Printf("Readed %v bytes, values 0x%x\n", n, rq.b)
+
+}
+
+func TestWriteAt(t *testing.T) {
+	var size uint8 = 0xA
+	var id IPbusTransactionID = 1
+	var addr BaseAddress = 0xEFB
+	var data = []IPbusWord{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x8}
+
+	// Set Transaction ID
+	err := setTransactionID(id)
+	if err != nil {
+		t.Errorf("Error %v\n", err)
+	}
+
+	// Set Transaction Base Address
+	err = setBaseAddress(addr)
+	if err != nil {
+		t.Errorf("Error %v\n", err)
+	}
+
+	// Define Transaction request
+	wq := new(IPbusRequest)
+	wq.typeId = WriteTypeID
+	wq.addr = baseAddress
+	wq.data = data
+	wq.words = size
+	wq.id = transactionID
+	wt := []byte{
+		0x70, 0x01, 0x02, 0x03,
+		0x74, 0x05, 0x06, 0x07,
+	}
+
+	// Encode method
+	n, err := wq.WriteAt(wt, int64(wq.addr))
+	// 20 0001 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt := []byte{
+		0x20, 0x01, 0x0a, 0x1f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	if !bytes.Equal(bt, wq.b) {
+		t.Errorf("Expected buffer 0x%x, generated %#x\n", bt, wq)
+	}
+	fmt.Printf("Wroted %v bytes, values 0x%x\n", n, wq.b)
+
+	// Read set transaction header and
+	n, err = wq.WriteAt(wt, int64(wq.addr))
+	// 20 0002 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x02, 0x0a, 0x1f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	if !bytes.Equal(bt, wq.b) {
+		t.Errorf("Expected buffer 0x%x, generated 0x%x\n", bt, wq.b)
+	}
+	fmt.Printf("Wroted %v bytes, values 0x%x\n", n, wq.b)
+
+	// 20 0003 f 0
+	// 2 002 0b 0 f
+	// 00000efb
+	bt = []byte{
+		0x20, 0x03, 0x0a, 0x1f,
+		0x00, 0x00, 0x0e, 0xfb,
+	}
+	n, err = wq.WriteAt(wt, int64(wq.addr))
+	if !bytes.Equal(bt, wq.b) {
+		t.Errorf("Expected buffer 0x%x, generated %#x\n", bt, wq.b)
+	}
+	fmt.Printf("Wroted %v bytes, values %#x\n", n, wq.b)
 
 }
