@@ -40,6 +40,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/tarm/serial"
 )
 
 // Implementation of IPbus protocol version 2.0
@@ -1163,3 +1164,5 @@ func Write(p []byte) (n int, err error) {
 //func WriteTo(w Writer) (n int64, err error) {
 
 //}
+
+func Open
