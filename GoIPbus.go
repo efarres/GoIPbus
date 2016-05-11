@@ -125,7 +125,15 @@ type IPbusRequest struct {
 	b        []byte
 }
 
+
+// IPbus buffer of words
+type IPbusPayload struct {
+	words    uint8
+	data     []IPbusWord
+}
+
 // IPbusResponse structure for Encode/Decode
+// 
 type IPbusResponse struct {
 	id       IPbusTransactionID
 	words    uint8
@@ -133,6 +141,7 @@ type IPbusResponse struct {
 	infoCode IPbusInfoCode
 	data     []IPbusWord
 	b        []byte
+	payload	 IPbusPayload
 }
 
 //	• Info Code (four bits at 3 → 0)

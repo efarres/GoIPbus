@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<connections>
+  <connection id="ctp6.test" uri="ipbustcp-2.0://localhost:60002"	address_table="file://test_address.xml" />
+  <connection id="ctp6.frontend.test" uri="ipbustcp-2.0://localhost:60001"	address_table="file://test_address.xml" />
+  <connection id="dummy.controlhubtest" uri="chtcp-2.0://localhost:10203?target=localhost:60001"	address_table="file://test_address.xml" />
+</connections>
+

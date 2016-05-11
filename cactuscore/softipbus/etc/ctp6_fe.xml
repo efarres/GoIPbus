@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<node description="Memory map for CTP6 front end">
+  <!-- Optical link capture rams -->
+  <node id="MGT0" address="0x60000000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #0"/>
+  <node id="MGT1" address="0x60001000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #1"/>
+  <node id="MGT2" address="0x60002000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #2"/>
+  <node id="MGT3" address="0x60003000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #3"/>
+  <node id="MGT4" address="0x60004000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #4"/>
+  <node id="MGT5" address="0x60005000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #5"/>
+  <node id="MGT6" address="0x60006000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #6"/>
+  <node id="MGT7" address="0x60007000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #7"/>
+  <node id="MGT8" address="0x60008000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #8"/>
+  <node id="MGT9" address="0x60009000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #9"/>
+  <node id="MGT10" address="0x6000a000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #10"/>
+  <node id="MGT11" address="0x6000b000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #11"/>
+  <node id="MGT12" address="0x6000c000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #12"/>
+  <node id="MGT13" address="0x6000d000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #13"/>
+  <node id="MGT14" address="0x6000e000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #14"/>
+  <node id="MGT15" address="0x6000f000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #15"/>
+  <node id="MGT16" address="0x60010000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #16"/>
+  <node id="MGT17" address="0x60011000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #17"/>
+  <node id="MGT18" address="0x60012000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #18"/>
+  <node id="MGT19" address="0x60013000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #19"/>
+  <node id="MGT20" address="0x60014000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #20"/>
+  <node id="MGT21" address="0x60015000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #21"/>
+  <node id="MGT22" address="0x60016000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #22"/>
+  <node id="MGT23" address="0x60017000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #23"/>
+  <node id="MGT24" address="0x60018000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #24"/>
+  <node id="MGT25" address="0x60019000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #25"/>
+  <node id="MGT26" address="0x6001a000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #26"/>
+  <node id="MGT27" address="0x6001b000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #27"/>
+  <node id="MGT28" address="0x6001c000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #28"/>
+  <node id="MGT29" address="0x6001d000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #29"/>
+  <node id="MGT30" address="0x6001e000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #30"/>
+  <node id="MGT31" address="0x6001f000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #31"/>
+  <node id="MGT32" address="0x60020000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #32"/>
+  <node id="MGT33" address="0x60021000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #33"/>
+  <node id="MGT34" address="0x60022000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #34"/>
+  <node id="MGT35" address="0x60023000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #35"/>
+  <node id="MGT36" address="0x60024000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #36"/>
+  <node id="MGT37" address="0x60025000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #37"/>
+  <node id="MGT38" address="0x60026000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #38"/>
+  <node id="MGT39" address="0x60027000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #39"/>
+  <node id="MGT40" address="0x60028000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #40"/>
+  <node id="MGT41" address="0x60029000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #41"/>
+  <node id="MGT42" address="0x6002a000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #42"/>
+  <node id="MGT43" address="0x6002b000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #43"/>
+  <node id="MGT44" address="0x6002c000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #44"/>
+  <node id="MGT45" address="0x6002d000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #45"/>
+  <node id="MGT46" address="0x6002e000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #46"/>
+  <node id="MGT47" address="0x6002f000" size="1024" mode="incremental" permission="r" description="Capture RAM for link #47"/>
+  <!-- Optical link control & status registers -->
+  <node id="GTResetBank00to11" address="0x600F0000" mask="0x00000FFF" permission="rw" description="reset for links 00 to 11"/>
+  <node id="GTResetBank12to23" address="0x600F0004" mask="0x00000FFF" permission="rw" description="reset for links 12 to 23"/>
+  <node id="GTResetBank24to35" address="0x600F0008" mask="0x00000FFF" permission="rw" description="reset for links 24 to 35"/>
+  <node id="GTResetBank36to47" address="0x600F000C" mask="0x00000FFF" permission="rw" description="reset for links 36 to 47"/>
+
+  <node id="GTPowerDownBank00to11" address="0x600F0010" mask="0x00000FFF" permission="rw" description="power down for links 00 to 11"/>
+  <node id="GTPowerDownBank12to23" address="0x600F0014" mask="0x00000FFF" permission="rw" description="power down for links 12 to 23"/>
+  <node id="GTPowerDownBank24to35" address="0x600F0018" mask="0x00000FFF" permission="rw" description="power down for links 24 to 35"/>
+  <node id="GTPowerDownBank36to47" address="0x600F001C" mask="0x00000FFF" permission="rw" description="power down for links 36 to 47"/>
+
+  <node id="RXPLLResetBank00to11" address="0x600F0020" mask="0x00000FFF" permission="rw" description="PLL reset for links 00 to 11"/>
+  <node id="RXPLLResetBank12to23" address="0x600F0024" mask="0x00000FFF" permission="rw" description="PLL reset for links 12 to 23"/>
+  <node id="RXPLLResetBank24to35" address="0x600F0028" mask="0x00000FFF" permission="rw" description="PLL reset for links 24 to 35"/>
+  <node id="RXPLLResetBank36to47" address="0x600F002C" mask="0x00000FFF" permission="rw" description="PLL reset for links 36 to 47"/>
+
+  <node id="RXEqualizerMix" address="0x600F0030" mask="0b11" permission="rw" description="Something complicated."/>
+
+  <!-- Capture control registers -->
+  <node id="OrbitCharReq" address="0x600F0034" mask="0x0000000FF" permission="rw" description="Orbit character to trigger capture"/>
+  <node id="CaptureTrigger" address="0x600F0038" mask="0x01" permission="rw" description="Trigger link capture"/>
+
+  <!-- Error flags -->
+  <node id="GTRXUnderflowBank00to11" address="0x600F003C" mask="0x00000FFF" permission="r" description="underflow for links 00 to 11"/>
+  <node id="GTRXUnderflowBank12to23" address="0x600F0040" mask="0x00000FFF" permission="r" description="underflow for links 12 to 23"/>
+  <node id="GTRXUnderflowBank24to35" address="0x600F0044" mask="0x00000FFF" permission="r" description="underflow for links 24 to 35"/>
+  <node id="GTRXUnderflowBank36to47" address="0x600F0048" mask="0x00000FFF" permission="r" description="underflow for links 36 to 47"/>
+
+  <node id="GTRXOverflowBank00to11" address="0x600F004C" mask="0x00000FFF" permission="r" description="overflow for links 00 to 11"/>
+  <node id="GTRXOverflowBank12to23" address="0x600F0050" mask="0x00000FFF" permission="r" description="overflow for links 12 to 23"/>
+  <node id="GTRXOverflowBank24to35" address="0x600F0054" mask="0x00000FFF" permission="r" description="overflow for links 24 to 35"/>
+  <node id="GTRXOverflowBank36to47" address="0x600F0058" mask="0x00000FFF" permission="r" description="overflow for links 36 to 47"/>
+
+  <node id="GTRXLossOfSyncBank00to11" address="0x600F005C" mask="0x00000FFF" permission="r" description="loss of sync for links 00 to 11"/>
+  <node id="GTRXLossOfSyncBank12to23" address="0x600F0060" mask="0x00000FFF" permission="r" description="loss of sync for links 12 to 23"/>
+  <node id="GTRXLossOfSyncBank24to35" address="0x600F0064" mask="0x00000FFF" permission="r" description="loss of sync for links 24 to 35"/>
+  <node id="GTRXLossOfSyncBank36to47" address="0x600F0068" mask="0x00000FFF" permission="r" description="loss of sync for links 36 to 47"/>
+
+  <node id="GTRXPLLKDetBank00to11" address="0x600F006C" mask="0x00000FFF" permission="r" description="PLL k-detected for links 00 to 11"/>
+  <node id="GTRXPLLKDetBank12to23" address="0x600F0070" mask="0x00000FFF" permission="r" description="PLL k-detected for links 12 to 23"/>
+  <node id="GTRXPLLKDetBank24to35" address="0x600F0074" mask="0x00000FFF" permission="r" description="PLL k-detected for links 24 to 35"/>
+  <node id="GTRXPLLKDetBank36to47" address="0x600F0078" mask="0x00000FFF" permission="r" description="PLL k-detected for links 36 to 47"/>
+
+  <node id="GTRXErrorDetBank00to11" address="0x600F007C" mask="0x00000FFF" permission="r" description="error detected for links 00 to 11"/>
+  <node id="GTRXErrorDetBank12to23" address="0x600F0080" mask="0x00000FFF" permission="r" description="error detected for links 12 to 23"/>
+  <node id="GTRXErrorDetBank24to35" address="0x600F0084" mask="0x00000FFF" permission="r" description="error detected for links 24 to 35"/>
+  <node id="GTRXErrorDetBank36to47" address="0x600F0088" mask="0x00000FFF" permission="r" description="error detected for links 36 to 47"/>
+</node>

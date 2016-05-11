@@ -1,0 +1,33 @@
+# Object files
+*.o
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+*.dSYM
+
+# Executables
+*.exe
+*.out
+*.app
+bin/*
+tests/bin/*
+lib/
+
+# makefile stuff
+*.dep
+
+# python junk
+*.pyc
+
+# reference implementations
+uhal/
+
+# svn client dir
+.svn

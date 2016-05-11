@@ -1,0 +1,245 @@
+#!/usr/bin/env python
+
+"""
+
+Command/readout the CTP6 links
+
+"""
+
+import argparse
+import logging
+import os
+import sys
+
+import uhal
+from termcolor import colored
+
+
+BANKS = [
+    "Bank00to11", 
+    "Bank12to23",
+    "Bank24to35",
+    "Bank36to47",
+]
+
+def expand_links(links):
+    """Expand link-ranges in the form XX-YY"""
+    for link in links:
+        if '-' not in link:
+            yield int(link)
+        else:
+            low, high = tuple(link.split('-'))
+            for i in range(int(low), int(high) + 1):
+                yield i
+
+def build_masked_set(bank_index, links):
+    """ Find the correct per-bank bit mask for a given bank + link set """
+    output = 0
+    for link in links:
+        bank_for_link = link / 12
+        if bank_index != bank_for_link:
+            continue
+        offset = link % 12
+        output |= (1 << offset)
+    return output
+    
+
+log = logging.getLogger(__name__)
+
+def do_reset(hw, args):
+    """ Reset the desired MGTs """
+    if args.power_down:
+        log.info("Powering down links")
+        pwr_nodes = [hw.getNode("GTPowerDown" + bank) for bank in BANKS]
+        for ibank, node in enumerate(pwr_nodes):
+            mask = build_masked_set(ibank, args.links)
+            log.debug("Masked value: %x", mask)
+            node.write(mask)
+        hw.dispatch()
+        for node in pwr_nodes:
+            node.write(0x0)
+        hw.dispatch()
+
+    log.info("Resetting links")
+    rst_nodes = [hw.getNode("GTReset" + bank) for bank in BANKS]
+    for ibank, node in enumerate(rst_nodes):
+        mask = build_masked_set(ibank, args.links)
+        node.write(mask)
+    hw.dispatch()
+    for node in rst_nodes:
+        node.write(0x0)
+    hw.dispatch()
+
+
+def do_capture(hw, args):
+    log.info("Setting orbit trigger character to 0x%x", int(args.capture_char, 16))
+    orbit_char_reg = hw.getNode("OrbitCharReq")
+    trigger = hw.getNode("CaptureTrigger")
+
+    orbit_char_reg.write(int(args.capture_char, 16));
+    trigger.write(0)
+    hw.dispatch()
+
+    log.info("Triggering capture")
+    trigger.write(1)
+    hw.dispatch()
+
+    rams = [hw.getNode('MGT%i' % link) for link in args.links]
+
+
+    expected_word_fn = None
+    if args.expected:
+        log.info("Loading expected pattern from %s", args.expected)
+        mod = __import__(args.expected.replace('.py', ''))
+        expected_word_fn = getattr(mod, 'pattern')
+
+    sys.stdout.write('     word: ')
+    sys.stdout.write(' '.join('%8i' % word for word in range(args.ncapture)))
+    sys.stdout.write('\n')
+
+    for link, ram in zip(args.links, rams):
+        sys.stdout.write('link %5i ' % link)
+        result = ram.readBlock(args.ncapture)
+        hw.dispatch()
+        result_strs = []
+        for idx, word in enumerate(result):
+            if args.expected:
+                expected_data = expected_word_fn(link)
+                exp = expected_data[idx % len(expected_data)]
+                if exp != word:
+                    result_strs.append(colored('%08x' % word, 'red'))
+                else:
+                    result_strs.append(colored('%08x' % word, 'green'))
+            else:
+                result_strs.append('%8x' % word)
+
+        sys.stdout.write(' '.join(result_strs))
+        sys.stdout.write('\n')
+
+    trigger.write(0)
+    hw.dispatch()
+
+
+def do_status(hw, args):
+    """ Print out the status registers from all of the links """
+    status_flags = {
+        'Overflow  ' : {
+            'prefix': 'GTRXUnderflow',
+            'bad' : True,
+        },
+        'Underflow ': {
+            'prefix': 'GTRXOverflow',
+            'bad' : True,
+        },
+        'LossSync  ': {
+            'prefix': 'GTRXLossOfSync',
+            'bad' : True,
+        },
+        'PLLk OK   ': {
+            'prefix': 'GTRXPLLKDet',
+            'bad' : False,
+        },
+        'ErrDetect ': {
+            'prefix': 'GTRXErrorDet',
+            'bad' : True,
+        },
+    }
+    sys.stdout.write('----------')
+    for underline in range(len(args.links)):
+        sys.stdout.write('---')
+    sys.stdout.write('\n')
+    sys.stdout.write('Flag      ')
+    for link in args.links:
+        sys.stdout.write('%3i' % link)
+    sys.stdout.write('\n')
+    sys.stdout.write('----------')
+    for underline in range(len(args.links)):
+        sys.stdout.write('---')
+    sys.stdout.write('\n')
+    
+
+    for flag, flag_cfg in status_flags.iteritems():
+        flag_cfg['banks'] = [flag_cfg['prefix'] + bank for bank in BANKS]
+        flag_cfg['nodes'] = [hw.getNode(bank) for bank in flag_cfg['banks']]
+        flag_cfg['values'] = [node.read() for node in flag_cfg['nodes']]
+        # eventually do the whole dispatch all at once
+        hw.dispatch()
+        sys.stdout.write(flag)
+        for link in args.links:
+            value = bool(flag_cfg['values'][link / 12].value() & (1 << (link % 12)))
+            if value == flag_cfg['bad']:
+                sys.stdout.write(colored(' E ', 'red'))
+            else:
+                sys.stdout.write(colored(' * ', 'green'))
+        sys.stdout.write('\n')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("command", choices=['reset', 'status', 'capture'],
+                        help="Action to perform")
+
+    parser.add_argument("links", nargs='*', help="Specify links. "
+                        "If none are specified, reset all.")
+
+    parser.add_argument("--connection", 
+                        help="Manually connection XML file. "
+                        "If not specified, take from CTP6_CONNECTION env.")
+    parser.add_argument("--verbose", action='store_true',
+                        help="Increase verbosity")
+
+    parser_rst = parser.add_argument_group('reset')
+    parser_stat = parser.add_argument_group('status')
+    parser_cap = parser.add_argument_group('capture')
+
+    # Reset arguments
+    parser_rst.add_argument("--power-down", action='store_true', dest='power_down',
+                            help="Additionally power down the links")
+
+    # Capture arguments
+    parser_cap.add_argument("--orbit-capture-char", dest='capture_char',
+                            type=str, metavar='0xbc', default='0xbc',
+                            help="character to trigger capture "
+                            "- default: %(default)s")
+
+    parser_cap.add_argument("--nwords", dest='ncapture',
+                            type=int, metavar='N', default=4,
+                            help="Number of words to capture from each link"
+                            "- default: 0x%(default)i")
+
+    parser_cap.add_argument("--expected", metavar='pattern.txt', 
+                            help="Pattern file with 1 word/line in hex")
+
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
+        uhal.setLogLevelTo(uhal.LogLevel.WARNING)
+    else:
+        uhal.setLogLevelTo(uhal.LogLevel.WARNING)
+        logging.basicConfig(level=logging.WARNING)
+
+    if not args.connection:
+        args.connection = os.environ['CTP6_CONNECTION']
+
+    if not args.links:
+        log.debug("Using all links")
+        args.links = range(48)
+    else:
+        args.links = list(expand_links(args.links))
+
+    hw_connection = 'file://%s' % args.connection
+    log.info("Setting up connection: %s", hw_connection)
+    manager = uhal.ConnectionManager(hw_connection)
+
+    hw = manager.getDevice('ctp6.frontend')
+
+    commands = {
+        'reset': do_reset,
+        'status': do_status,
+        'capture': do_capture
+    }
+
+    commands[args.command](hw, args)
+
+    log.info("done.")

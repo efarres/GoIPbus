@@ -1,0 +1,36 @@
+###############################################################################
+# This file allows specification of options in the Petalinux configuration GUI
+# Please modify this file if you want to configure your own application.
+# You can uncommon and/or change the following Kconfig elements.
+
+
+
+if USER_APPS_SOFTIPBUS
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_ENABLED
+        bool "Enable remote (forwarded over serial) memory IPBus server"
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_TX
+        string "Outgoing serial device for softipbus-forward"
+        default /dev/ttyUL1
+        depends on CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_ENABLED
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_RX
+        string "Incoming serial device for softipbus-forward"
+        default /dev/ttyUL1
+        depends on CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_ENABLED
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_PORT
+        string "TCP port for serial-forwarding IPBus server"
+        default 60001
+        depends on CONFIG_USER_APPS_SOFTIPBUS_IPBUS_FORWARD_ENABLED
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_LOCAL_ENABLED
+        bool "Enable local (linux) memory IPBus server"
+
+        config CONFIG_USER_APPS_SOFTIPBUS_IPBUS_LOCAL_PORT
+        string "TCP port for local memory IPBus server"
+        default 60002
+        depends on CONFIG_USER_APPS_SOFTIPBUS_IPBUS_LOCAL_ENABLED
+        
+endif

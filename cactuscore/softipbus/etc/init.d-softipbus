@@ -1,0 +1,4 @@
+#!/bin/sh
+
+[ -x /bin/softipbus ] && /bin/softipbus &
+[ -x /bin/softipbus-forward ] && /bin/softipbus-forward &
